@@ -16,36 +16,73 @@ export default function Home() {
   
   const API_URL = "https://api.openai.com/v1/chat/completions";
 
-  async function sendRequest() {
-    // update the message history
-    const newMessage = {role: "user", content: userMessage};
-    const newMessages = [...messages, newMessage];
+  const sendRequest = async () => {
+    const updatedMessages = [
+      ...messages,
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ];
 
-    setMessages(newMessages);
+    setMessages(updatedMessages);
     setUserMessage("");
 
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-      },
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: newMessages,
-        steam: true,
-      }),
-    });
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: updatedMessages,
+          stream: true,
+        }),
+      });
 
-    const responseJson = await response.json();
+      const reader = response.body.getReader();
 
-    const newBotMessage = responseJson.choices[0].message;
+      let newMessage = "";
+      const parser = createParser((event) => {
+        if (event.type === "event") {
+          const data = event.data;
+          if (data === "[DONE]") {
+            return;
+          }
+          const json = JSON.parse(event.data);
+          const content = json.choices[0].delta.content;
 
-    const newMessage2 = [...newMessages, newBotMessage];
+          if (!content) {
+            return;
+          }
 
-    setMessages(newMessage2);
-  
-  }
+          newMessage += content;
+
+          const updatedMessages2 = [
+            ...updatedMessages,
+            { role: "assistant", content: newMessage },
+          ];
+
+          setMessages(updatedMessages2);
+        } else {
+          return "";
+        }
+      });
+
+      // eslint-disable-next-line
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = new TextDecoder().decode(value);
+        parser.feed(text);
+      }
+    } catch (error) {
+      console.error("error");
+      window.alert("Error:" + error.message);
+    }
+  };
 
   return (
     <>
@@ -60,7 +97,7 @@ export default function Home() {
             <input 
             type="password"
             className="border p-2 rounded"
-            onChange={e => setApiKey(e.target.value)}
+            onChange={(e) => setApiKey(e.target.value)}
             value={apiKey}
             placeholder="Paste API key here" />
           </div>
@@ -90,9 +127,14 @@ export default function Home() {
         <textarea 
         value={userMessage}
         onChange={(e) => setUserMessage(e.target.value)}
-        className="border text-lg rounded-md p-1 flex-1">
-        </textarea>
-        <button className="bg-blue-500 hover:bg-blue-600 border rounded-md text-white text-lg w-20 p-2 ml-2">
+        className="border text-lg rounded-md p-1 flex-1"
+        rows={1}
+        placeholder="Ask me anything..." 
+        />
+        <button 
+          onClick= {sendRequest}
+          className="bg-blue-500 hover:bg-blue-600 border rounded-md text-white text-lg w-20 p-2 ml-2"
+        >
           Send
         </button>
       </div>
