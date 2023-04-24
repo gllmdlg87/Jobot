@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import Head from "next/head";
 import { createParser } from "eventsource-parser";
+// import TextareaAutosize from "react-textarea-autosize";
+import Navbar from '../components/Navbar';
 
 const SYSTEM_MESSAGE = "You are Jobot, an helpful AI created by Jovian using state-of-the art ML Models";
 
@@ -91,17 +93,7 @@ export default function Home() {
     </Head>
     <div className="flex flex-col h-screen">
       { /* Navigation Bar */}
-      <nav className = "shadow px-4 py-2 flex flex-rox justify-between items-center">
-          <div className="text-xl font-bold">Jobot</div>
-          <div>
-            <input 
-            type="password"
-            className="border p-2 rounded"
-            onChange={(e) => setApiKey(e.target.value)}
-            value={apiKey}
-            placeholder="Paste API key here" />
-          </div>
-      </nav>
+      <Navbar />
 
     {/* Message History */}
     <div className="flex-1 overflow-y-scroll">
