@@ -1,21 +1,83 @@
 import Navbar from "@/components/Navbar";
+import { useSupabaseClient } from "@supabase/auth-helpers-react";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 
 export default function Login() {
 
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
 
+    const router = useRouter;
+
+    const supabase = useSupabaseClient();
+    
+    async function sendCode() {
+
+        console.log("email entered", email);
+
+        const { data, error } = await supabase.auth.signInWithOtp({
+            email: email,
+          });
+
+          if (data.user) {
+            toast.success("Verification code sent. Check your email!");
+            console.log("Verification code sent");
+          }
+          if (error) {
+            toast.error("Failed to send verification code");
+            console.error("Failed to send verification code", error)
+            return;
+          }
+    }
+
+    async function submitCode() {
+
+        const { data, error } = await supabase.auth.verifyOtp({
+            email: email,
+            token: code,
+            type: "magicLink",
+        });
+
+        if (data?.user) {
+            toast.success('Signed in successuflly');
+            console.log("Signed in successfully", data);
+            router.push('.');
+        }
+
+        if (error) {
+            console.error('Failed to sign in', error);
+
+            const { data: d2, error: e2} = await supabase.auth.verifyOtp({
+                email: email,
+                token: code,
+                type: "signup",
+            });
+
+            if (d2.user) {
+                toast.success("Signed up successfully");
+                console.log("Signed up successfully", d2);
+                router.push('/');
+            }
+
+            if (e2) {
+                toast.error("Sign up failed");
+                console.error("Sign up failed", e2)
+            }
+        }
+    }
+
     return (
         <>
             <Head>
               <title>Jobot - Your friendly neighborhood AI</title>
             </Head>
+            <Toaster />
             <div className="flex flex-col h-screen">
                 <Navbar />
-                {/* <Toaster /> */}
                 <div className="mx-auto max-w-md">
                 <div className="border self-center rounded-lg my-8 p-4 m-4">
                     <div className="text-center text-xl font-bold text-gray-800">
@@ -33,7 +95,7 @@ export default function Login() {
                     />
                     <button
                         className="w-40 border text-sm font-medium px-4 py-2 mt-2 rounded-md bg-gray-50 hover:bg-gray-100"
-                        // onClick={sendCode}
+                        onClick={sendCode}
                     >
                         Send Code
                     </button>
@@ -51,7 +113,7 @@ export default function Login() {
                     value={code}
                 />
                 <button
-                    // onClick={submitCode}
+                    onClick={submitCode}
                     className="w-40 border border-blue-600 text-sm font-medium px-4 py-2 mt-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white"
                 >
                     Sign In

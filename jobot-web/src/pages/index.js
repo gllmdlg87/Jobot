@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import Head from "next/head";
 import { createParser } from "eventsource-parser";
-// import TextareaAutosize from "react-textarea-autosize";
+import TextareaAutosize from "react-textarea-autosize";
 import Navbar from '../components/Navbar';
 
-const SYSTEM_MESSAGE = "You are Jobot, an helpful AI created by Jovian using state-of-the art ML Models";
+const SYSTEM_MESSAGE =
+  "You are Jobot, an helpful AI created by Jovian using state-of-the art ML Models";
 
 export default function Home() {
   const [apiKey, setApiKey] = useState("");
@@ -18,14 +19,35 @@ export default function Home() {
   
   const API_URL = "https://api.openai.com/v1/chat/completions";
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendRequest();
+    }
+  };
+
   const sendRequest = async () => {
+    if (!userMessage) {
+      alert("Please enter a message before you hit send");
+    }
+
+    if (!apiKey) {
+      alert(
+        "Please provide your OpenAI API key in the navbar. Get it from https://platform.openai.com . NOTE: Your API key is never sent to our server."
+      );
+      return;
+    }
+
+    const oldUserMessage = userMessage;
+    const oldMessages = messages;
+
     const updatedMessages = [
       ...messages,
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ];
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ];
 
     setMessages(updatedMessages);
     setUserMessage("");
@@ -43,6 +65,12 @@ export default function Home() {
           stream: true,
         }),
       });
+
+      if (response.status !== 200) {
+        throw new Error(
+          `OpenAI API returned an error. Please ensure you've provided the right API key. Check the "Console" or "Network" of your browser's developer tools for details.`
+        );
+      }
 
       const reader = response.body.getReader();
 
@@ -82,6 +110,9 @@ export default function Home() {
       }
     } catch (error) {
       console.error("error");
+
+      setUserMessage(oldUserMessage);
+      setMessages(oldMessages);
       window.alert("Error:" + error.message);
     }
   };
@@ -103,7 +134,7 @@ export default function Home() {
           .map((message, idx) => (
           <div key={idx} className='my-3'>
             <div className="font-bold">
-              {message.role === "user" ? "You" : "Jobo"}
+              {message.role === "user" ? "You" : "Jobot"}
             </div>
             <div className="text-lg prose">
               <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -115,13 +146,16 @@ export default function Home() {
 
     {/* Message Input Box */}
     <div>
-      <div className="w-full max-w-screen mx-auto flex px-4 pb-4">
-        <textarea 
+      <div className="w-full max-w-screen mx-auto flex px-4 pb-4 items-start">
+        <TextareaAutosize
         value={userMessage}
-        onChange={(e) => setUserMessage(e.target.value)}
-        className="border text-lg rounded-md p-1 flex-1"
-        rows={1}
+        autoFocus
+        maxRows={10}
+        onKeyDown={handleKeyDown}
         placeholder="Ask me anything..." 
+        onChange={(e) => setUserMessage(e.target.value)}
+        className="border text-lg rounded-md p-1 flex-1 resize-none"
+        rows={1}
         />
         <button 
           onClick= {sendRequest}
@@ -131,9 +165,7 @@ export default function Home() {
         </button>
       </div>
     </div>
-
-  </div></>
-    
+  </div>
+  </>
   );
-
 }
