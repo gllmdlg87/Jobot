@@ -4,20 +4,21 @@ import Head from "next/head";
 import { createParser } from "eventsource-parser";
 import TextareaAutosize from "react-textarea-autosize";
 import Navbar from '../components/Navbar';
+import { useUser } from "@supabase/auth-helpers-react";
+import { streamOpenAIResponse } from "@/utiils/openai";
 
 const SYSTEM_MESSAGE =
   "You are Jobot, an helpful AI created by Jovian using state-of-the art ML Models";
 
 export default function Home() {
-  const [apiKey, setApiKey] = useState("");
+  
+  const user = useUser();
   
   const [messages, setMessages] = useState([
     { role: "system", content: SYSTEM_MESSAGE},
   ]);
 
   const [userMessage, setUserMessage] = useState("");
-  
-  const API_URL = "https://api.openai.com/v1/chat/completions";
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -27,17 +28,17 @@ export default function Home() {
   };
 
   const sendRequest = async () => {
-    if (!userMessage) {
-      alert("Please enter a message before you hit send");
-    }
-
-    if (!apiKey) {
-      alert(
-        "Please provide your OpenAI API key in the navbar. Get it from https://platform.openai.com . NOTE: Your API key is never sent to our server."
-      );
+    
+    if (!user) {
+      alert("Please log in to send a message");
       return;
     }
-
+    
+    if (!userMessage) {
+      alert("Please enter a message before you hit send");
+      return;
+    }
+   
     const oldUserMessage = userMessage;
     const oldMessages = messages;
 
@@ -53,11 +54,10 @@ export default function Home() {
     setUserMessage("");
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
@@ -67,47 +67,18 @@ export default function Home() {
       });
 
       if (response.status !== 200) {
-        throw new Error(
-          `OpenAI API returned an error. Please ensure you've provided the right API key. Check the "Console" or "Network" of your browser's developer tools for details.`
-        );
+        throw new Error(`OpenAI API returned an error. `);
       }
 
-      const reader = response.body.getReader();
-
-      let newMessage = "";
-      const parser = createParser((event) => {
-        if (event.type === "event") {
-          const data = event.data;
-          if (data === "[DONE]") {
-            return;
-          }
-          const json = JSON.parse(event.data);
-          const content = json.choices[0].delta.content;
-
-          if (!content) {
-            return;
-          }
-
-          newMessage += content;
-
-          const updatedMessages2 = [
-            ...updatedMessages,
-            { role: "assistant", content: newMessage },
-          ];
-
-          setMessages(updatedMessages2);
-        } else {
-          return "";
-        }
+      streamOpenAIResponse(response, newMessage => {
+        console.log('newMessage:', newMessage);
+        const updatedMessage2 = [
+          ...updatedMessages,
+          { role: 'assistant', content: 'newMessage'},
+        ]; 
+        setMessages(updatedMessage2);
       });
 
-      // eslint-disable-next-line
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = new TextDecoder().decode(value);
-        parser.feed(text);
-      }
     } catch (error) {
       console.error("error");
 
